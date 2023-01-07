@@ -11,15 +11,14 @@ import googleapiclient.errors
 import httplib2
 from google.auth.transport.requests import AuthorizedSession
 from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import build
-
 from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
 
 
 def retriable_exceptions(fun, retriable_exceptions, max_retries=None):
     """Run function and retry on some exceptions (with exponential backoff)."""
     retry = 0
-    while 1:
+    while True:
         try:
             return fun()
         except tuple(retriable_exceptions) as exc:
@@ -128,8 +127,10 @@ def save_cred(cred, auth_file):
         print(json.dumps(cred_dict), file=f)
 
 
-def get_videos(session):
+def get_videos(session, token=None):
     q = {"filters": {"mediaTypeFilter": {"mediaTypes": ["VIDEO"]}}}
+    if token:
+        q["pageToken"] = token
     return session.post(
         "https://photoslibrary.googleapis.com/v1/mediaItems:search", json=q
     ).json()
@@ -167,6 +168,7 @@ def upload_stream(
     stream,
     title,
     description="",
+    privacy_status="private", # "unlisted", "public"
     tags=(),
 ):
     body = {
@@ -176,7 +178,7 @@ def upload_stream(
             "tags": list(tags),
         },
         "status": {
-            "privacyStatus": "unlisted",  # "private", "public"
+            "privacyStatus": privacy_status,
         },
     }
     body_keys = ",".join(body.keys())
@@ -240,10 +242,6 @@ class MediaStreamUpload(apiclient.http.MediaUpload):
         return self._resumable
 
     def getbytes(self, begin, length):
-        import ipdb
-
-        ipdb.set_trace()
-        print(f"{begin} - {length}")
         if self._cursor != begin:
             self._cursor = begin
             self._current_buffer = next(self._iter)
@@ -270,6 +268,8 @@ def main():
 
     session, youtube = get_authorized_sessions("token.json")
 
+
+    """
     videos = get_videos(session)
 
     v = videos["mediaItems"][0]    # [1]
@@ -279,7 +279,7 @@ def main():
         youtube, stream, title="[test] google photos 2 youtube"
     )
     print(response)
-
+    """
 
 if __name__ == "__main__":
     main()

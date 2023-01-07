@@ -1,0 +1,2 @@
+google-api-python-client>=2.71
+google_auth_oauthlib>=0.8.0
