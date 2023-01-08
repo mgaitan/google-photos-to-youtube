@@ -2,6 +2,11 @@
 
 Google Photos is expensive and Youtube is free. Why not move my videos there (using their bandwidth and resources for more pleasure)?
 
+## How it works
+
+It searches videos using the Google photos in your account and display a thumbnail of each one. Then you can complete some metadata and upload it to the same or different Youtube account. 
+The uploading process is done in chunks, so it doesn't require to download the full video to start uploading it. 
+
 
 ## Setup
 
@@ -14,17 +19,6 @@ It requires permissions on Google Photos and Youtube data v3 APIs to download an
 
 2. Replace `YOUR_CLIENT_ID` and `YOUR_CLIENT_SECRET` in the client_id.json file with the provided Client ID. 
 
-3. Locally `python google_photos_to_youtube.py` to generate the file `token.json` using the account that own the videos. 
-
-4. Open the notebook in colab uploading `client_id.json` and `token.json` if needed. Alternatively you can run it locally in Jupyter Lab. 
+3. Open the notebook in Colab and upload `client_id.json`. Then run the cells and follow the instructions. 
 
 
-## How it works
-
-It searches videos using the Google photos in your account and display a thumbnail of each one. Then you can complete some metadata and upload it to Youtube. The uploading process is done in chunks, so it doesn't require to download the full video to start uploading it. 
-
-
-
-## Acknowledgements
-
-This project was inspired by https://github.com/eshmu/gphotos-upload
