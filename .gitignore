@@ -1,5 +1,6 @@
 client_id.json
 token.json
+.ipynb_checkpoints/
 .venv
 __pycache__/
 *.py[cod]
