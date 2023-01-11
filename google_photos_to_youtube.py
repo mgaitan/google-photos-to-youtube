@@ -1,5 +1,8 @@
+import functools
 import http.client as httplib
 import socket
+
+from IPython.display import Markdown, display
 
 import apiclient.http
 import googleapiclient.errors
@@ -8,7 +11,6 @@ import ipywidgets as widgets
 from google.auth.transport.requests import AuthorizedSession
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
-from IPython.display import Markdown, display
 
 
 def login(service):
@@ -45,8 +47,38 @@ def login(service):
         return AuthorizedSession(flow.credentials)
 
 
-def get_videos(session, token=None):
-    q = {"filters": {"mediaTypeFilter": {"mediaTypes": ["VIDEO"]}}}
+@functools.cache
+def get_or_create_album(session):
+    result = session.get(
+        "https://photoslibrary.googleapis.com/v1/albums",
+        params={"excludeNonAppCreatedData": True},
+    )
+
+    for album in result.json().get("albums", []):
+        if album["title"] == "migrated-to-youtube":
+            return album["id"]
+    else:
+        response = session.post(
+            "https://photoslibrary.googleapis.com/v1/albums",
+            json={"album": {"title": "migrated-to-youtube"}},
+        )
+        return response.json()["id"]
+
+
+def add_to_album(session, item_id):
+    album_id = get_or_create_album(session)
+    return session.post(
+        f"https://photoslibrary.googleapis.com/v1/albums/{album_id}:batchAddMediaItems",
+        json={"mediaItemIds": [item_id]},
+    )
+    
+
+
+def get_videos(session, token=None, page_size=50):
+    q = {
+        "pageSize": page_size,
+        "filters": {"mediaTypeFilter": {"mediaTypes": ["VIDEO"]}},
+    }
     if token:
         q["pageToken"] = token
     return session.post(
@@ -160,7 +192,7 @@ class MediaStreamUpload(apiclient.http.MediaUpload):
         raise NotImplementedError("MediaIoBaseUpload is not serializable.")
 
 
-def app_block(video, session, youtube):
+def video_block(video, session, youtube):
     title = widgets.Text(
         value=video.get("description", video.get("id")),
         description="Title",
@@ -213,4 +245,26 @@ def app_block(video, session, youtube):
             )
             print(response)
 
+            # this approach is not working due API limitations 
+            # see https://stackoverflow.com/a/56897605
+            # add_to_album(session, video["id"])
+            
     button.on_click(on_button_clicked)
+
+
+def load_page(session, youtube, token=None):
+
+    videos = get_videos(session, token)
+    for video in videos["mediaItems"]:
+        video_block(video, session, youtube)
+
+    button = widgets.Button(description="Load more...")
+    output = widgets.Output()
+
+    def next_page(b):
+        button.close()
+        with output:
+            load_page(session, youtube, token=videos["nextPageToken"])
+    
+    button.on_click(next_page)
+    display(output, button)
