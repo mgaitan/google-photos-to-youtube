@@ -1,6 +1,9 @@
 import functools
+import getpass
 import http.client as httplib
+import json
 import socket
+from pathlib import Path
 
 from IPython.display import Markdown, display
 
@@ -13,10 +16,32 @@ from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 
 
+def create_client_id():
+    file = Path("client_id.json")
+    if file.exists():
+        print("file already exists")
+        return
+    client_id = input("CLIENT_ID")
+    client_secret = getpass.getpass(prompt="CLIENT_SECRET")
+
+    content = {
+        "installed": {
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://www.googleapis.com/oauth2/v3/token",
+            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+            "redirect_uris": ["urn:ietf:wg:oauth:2.0:oob", "http://localhost"],
+        }
+    }
+    file.write_text(json.dumps(content, indent=2))
+
+
 def login(service):
     scopes = {
         "photos": [
             "https://www.googleapis.com/auth/photoslibrary",
+            "https://www.googleapis.com/auth/photoslibrary.edit.appcreateddata",
             "https://www.googleapis.com/auth/photoslibrary.sharing",
         ],
         "youtube": ["https://www.googleapis.com/auth/youtube.upload"],
@@ -71,7 +96,6 @@ def add_to_album(session, item_id):
         f"https://photoslibrary.googleapis.com/v1/albums/{album_id}:batchAddMediaItems",
         json={"mediaItemIds": [item_id]},
     )
-    
 
 
 def get_videos(session, token=None, page_size=50):
@@ -245,10 +269,10 @@ def video_block(video, session, youtube):
             )
             print(response)
 
-            # this approach is not working due API limitations 
+            # this approach is not working due API limitations
             # see https://stackoverflow.com/a/56897605
             # add_to_album(session, video["id"])
-            
+
     button.on_click(on_button_clicked)
 
 
@@ -265,6 +289,6 @@ def load_page(session, youtube, token=None):
         button.close()
         with output:
             load_page(session, youtube, token=videos["nextPageToken"])
-    
+
     button.on_click(next_page)
     display(output, button)

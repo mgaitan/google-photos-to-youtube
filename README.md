@@ -10,16 +10,14 @@ The uploading process is done in chunks, so it doesn't require to download the f
 
 ## Setup
 
-1. Copy `client_id.json.dist` as `client_id.json`
+1. Follow https://developers.google.com/photos/library/guides/get-started to create a new project (as a "Desktop app" could work). Remember to copy `CLIENT_ID` and `CLIENT_SECRET` of your app.
 
-and follow https://developers.google.com/photos/library/guides/get-started to create a new project. 
 
-It requires permissions on Google Photos and Youtube data v3 APIs to download and upload from one service to the other. 
+2. In addition to Google Photos, your app requires access `Youtube data v3 API`. Enable it from https://console.cloud.google.com/apis/dashboard clicking in "Enable APIS and SERVICES"
 
-2. Replace `YOUR_CLIENT_ID` and `YOUR_CLIENT_SECRET` in the client_id.json file with the provided Client ID. 
 
-3. As your app will be in "Testing" mode, you need to authorize the specific accounts that will use the app. Goto to https://console.cloud.google.com/apis/credentials/consent and add them clicking in "+ Add user".
+3. As your app will be in "Testing" mode, you need to authorize the specific accounts that will use the app. Goto to https://console.cloud.google.com/apis/credentials/consent and add them clicking in "Add user". It could be more than one account as the source Google Photos account and the Youtube account could be differents. 
 
-3. Open the notebook in Colab and upload `client_id.json`. Then run the cells and follow the instructions. 
+4. Open the notebook in Colab, run the cells and follow the instructions. 
 
 
