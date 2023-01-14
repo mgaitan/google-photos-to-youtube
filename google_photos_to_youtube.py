@@ -300,9 +300,15 @@ def video_block(video, session, youtube):
     )
     description.layout.height = "6em"
     description.layout.width = "30em"
+    privacy = widgets.Dropdown(
+        options=["private", "unlisted", "public"],
+        value="private",
+        description='Privacy status:',
+        disabled=False,
+    ) 
+    privacy.layout.width = "30em"
     tags = widgets.Text(
         value="google-photos-to-youtube, ",
-        placeholder="from-google-photos",
         description="Tags",
         disabled=False,
     )
@@ -311,7 +317,7 @@ def video_block(video, session, youtube):
     button = widgets.Button(description="Upload to youtube!")
 
     thumb = Markdown(f"[![]({video['baseUrl']}=w300-h300-no)]({video['productUrl']})")
-    display(thumb, title, description, tags, button, output)
+    display(thumb, title, description, privacy, tags, button, output)
 
     def on_button_clicked(b):
         video_title = title.value.strip()
@@ -337,6 +343,7 @@ def video_block(video, session, youtube):
                 title=video_title,
                 description=description.value,
                 tags=[t.strip() for t in tags.value.split(",")],
+                privacy_status=privacy.value,
                 progress=bar,
             )
             print(response)
