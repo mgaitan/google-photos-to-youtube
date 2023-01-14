@@ -5,7 +5,7 @@ import json
 import socket
 from pathlib import Path
 
-from IPython.display import Markdown, display
+from IPython.display import Javascript, Markdown, display
 
 import apiclient.http
 import googleapiclient.errors
@@ -218,7 +218,7 @@ class MediaStreamUpload(apiclient.http.MediaUpload):
 
 def video_block(video, session, youtube):
     title = widgets.Text(
-        value=video.get("description", video.get("id")),
+        value=video.get("description", ""),
         description="Title",
         disabled=False,
     )
@@ -248,6 +248,12 @@ def video_block(video, session, youtube):
     display(thumb, title, description, tags, button, output)
 
     def on_button_clicked(b):
+        video_title = title.value.strip()
+        if not video_title:
+            title.placeholder = "Enter a title"
+            title.focus()
+            return
+
         with output:
             bar = widgets.IntProgress(
                 value=0,
@@ -262,7 +268,7 @@ def video_block(video, session, youtube):
             response = upload_stream(
                 youtube,
                 stream,
-                title=title.value,
+                title=video_title,
                 description=description.value,
                 tags=[t.strip() for t in tags.value.split(",")],
                 progress=bar,
