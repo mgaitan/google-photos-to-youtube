@@ -5,7 +5,7 @@ import json
 import socket
 from pathlib import Path
 
-from IPython.display import Javascript, Markdown, display
+from IPython.display import Markdown, display
 
 import apiclient.http
 import googleapiclient.errors
@@ -72,30 +72,91 @@ def login(service):
         return AuthorizedSession(flow.credentials)
 
 
-@functools.cache
-def get_or_create_album(session):
-    result = session.get(
-        "https://photoslibrary.googleapis.com/v1/albums",
-        params={"excludeNonAppCreatedData": True},
+def create_db_image(session, album_id):
+    data = Path("db_image.webp").read_bytes()
+    result = session.post(
+        "https://photoslibrary.googleapis.com/v1/uploads",
+        data,
+        headers={
+            "Content-type": "application/octet-stream",
+            "X-Goog-Upload-Content-Type": "image/webp",
+            "X-Goog-Upload-Protocol": "raw",
+        },
+    )
+    token = result.content.decode()
+
+    payload = {
+        "newMediaItems": [
+            {"description": "{}", "simpleMediaItem": {"uploadToken": token}}
+        ],
+    }
+    if album_id:
+        payload["albumId"] = album_id
+
+    response = session.post(
+        "https://photoslibrary.googleapis.com/v1/mediaItems:batchCreate", json=payload
     )
 
-    for album in result.json().get("albums", []):
-        if album["title"] == "migrated-to-youtube":
-            return album["id"]
-    else:
-        response = session.post(
-            "https://photoslibrary.googleapis.com/v1/albums",
-            json={"album": {"title": "migrated-to-youtube"}},
+    return response.json()["newMediaItemResults"][0]["mediaItem"]
+
+
+class DB:
+    """
+    A Borg (shared state instance) dict-like to permanently store already migrated videos
+
+    It's stored as a json blob in the description of the first item of the
+    album "migrated-to-youtube" that's created if needed.
+
+    This is a workaround to the limitations of the Goole Photos API
+    that doesn't allow to delete or update the description of items that weren't 
+    created by the app, nor add them to a custom album. 
+    """
+    _shared_state = {}  
+
+    def __init__(self, session):
+        self.__dict__ = self._shared_state
+        if not self._shared_state:
+            self.session = session
+            self.item = self._get_or_create_db()
+            self.data = json.loads(self.item.get("description", "{}"))
+
+    def __getitem__(self, key):
+        return self.data[key]
+
+    def __contains__(self, key):
+        return key in self.data
+
+    def __setitem__(self, key, value):
+        self.data[key] = value
+
+        self.session.patch(
+            f"https://photoslibrary.googleapis.com/v1/mediaItems/{self.item['id']}?updateMask=description",
+            json={"description": json.dumps(self.data, indent=2)},
         )
-        return response.json()["id"]
 
+    def _get_or_create_db(self):
+        """
+        return the MediaItem dict of the image that's store our db. 
+        If the album doesn't exist, it's created and an image is uploaded.
+        """
+        result = self.session.get(
+            "https://photoslibrary.googleapis.com/v1/albums",
+            params={"excludeNonAppCreatedData": True},
+        )
+        for album in result.json().get("albums", []):
+            if album["title"] == "migrated-to-youtube":
 
-def add_to_album(session, item_id):
-    album_id = get_or_create_album(session)
-    return session.post(
-        f"https://photoslibrary.googleapis.com/v1/albums/{album_id}:batchAddMediaItems",
-        json={"mediaItemIds": [item_id]},
-    )
+                result = self.session.post(
+                    "https://photoslibrary.googleapis.com/v1/mediaItems:search",
+                    json={"albumId": album["id"]},
+                )
+                return result.json()["mediaItems"][0]
+        else:
+            album = self.session.post(
+                "https://photoslibrary.googleapis.com/v1/albums",
+                json={"album": {"title": "migrated-to-youtube"}},
+            ).json()
+            return create_db_image(self.session, album["id"])
 
 
 def get_videos(session, token=None, page_size=50):
@@ -158,6 +219,7 @@ def upload_stream(
             return f"https://youtu.be/{response['id']}"
 
 
+# TODO retry when any of this exceptions happen
 RETRIABLE_EXCEPTIONS = [
     socket.error,
     IOError,
@@ -281,16 +343,25 @@ def video_block(video, session, youtube):
 
             # this approach is not working due API limitations
             # see https://stackoverflow.com/a/56897605
+            #
             # add_to_album(session, video["id"])
+
+            # update DB
+            db = DB(session)
+            db[video["productUrl"]] = response
 
     button.on_click(on_button_clicked)
 
 
 def load_page(session, youtube, token=None):
-
+    db = DB(session)
     videos = get_videos(session, token)
     for video in videos["mediaItems"]:
-        video_block(video, session, youtube)
+        item_url = video["productUrl"]
+        if item_url in db:
+            print(f"Item {item_url} already migrated: {db[item_url]}")
+        else:
+            video_block(video, session, youtube)
 
     button = widgets.Button(description="Load more...")
     output = widgets.Output()
