@@ -222,6 +222,7 @@ def video_block(video, session, youtube):
         description="Title",
         disabled=False,
     )
+    title.layout.width = "30em"
     description = widgets.Textarea(
         value="\n - ".join(
             [
@@ -235,12 +236,15 @@ def video_block(video, session, youtube):
         description="Description",
         disabled=False,
     )
+    description.layout.height = "6em"
+    description.layout.width = "30em"
     tags = widgets.Text(
         value="google-photos-to-youtube, ",
         placeholder="from-google-photos",
         description="Tags",
         disabled=False,
     )
+    tags.layout.width = "30em"
     output = widgets.Output()
     button = widgets.Button(description="Upload to youtube!")
 
