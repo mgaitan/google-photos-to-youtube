@@ -21,8 +21,8 @@ def create_client_id():
     if file.exists():
         print("file already exists")
         return
-    client_id = input("CLIENT_ID")
-    client_secret = getpass.getpass(prompt="CLIENT_SECRET")
+    client_id = input("CLIENT_ID: ")
+    client_secret = getpass.getpass(prompt="CLIENT_SECRET: ")
 
     content = {
         "installed": {
