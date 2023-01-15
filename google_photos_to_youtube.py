@@ -375,8 +375,9 @@ def load_page(session, youtube, token=None):
     videos = get_videos(session, token)
     for video in videos["mediaItems"]:
         item_url = video["productUrl"]
-        if item_url in db:
-            print(f"Item {item_url} already migrated: {db[item_url]}")
+        yt_url = db.get(item_url)
+        if yt_url:
+            print(f"Item {item_url} already migrated: {yt_url}")
         else:
             video_block(video, session, youtube)
 
