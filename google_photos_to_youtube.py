@@ -173,8 +173,8 @@ class DB(collections.abc.MutableMapping):
         for key, value in self.items():
             html.append("<tr><th>Google Photos</th><th>Youtube</th></tr>")
             html.append("<tr>")
-            html.append("<td>{0}</td>".format(key))
-            html.append("<td>{0}</td>".format(value))
+            html.append(f"<td><a href='{key}'>{key}</a></td>")
+            html.append(f"<td><a href='{value}'>{value}</a></td>")
             html.append("</tr>")
         html.append("</table>")
         return ''.join(html)
