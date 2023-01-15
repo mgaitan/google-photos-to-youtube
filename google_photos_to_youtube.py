@@ -168,6 +168,17 @@ class DB(collections.abc.MutableMapping):
             ).json()
             return create_db_image(self.session, album["id"])
 
+    def _repr_html_(self):
+        html = ["<table width=100%>"]
+        for key, value in self.iteritems():
+            html.append("<tr><th>Google Photos</th><th>Youtube</th></tr>")
+            html.append("<tr>")
+            html.append("<td>{0}</td>".format(key))
+            html.append("<td>{0}</td>".format(value))
+            html.append("</tr>")
+        html.append("</table>")
+        return ''.join(html)
+
 
 def get_videos(session, token=None, page_size=50):
     q = {
@@ -358,11 +369,6 @@ def video_block(video, session, youtube):
             )
             print(response)
 
-            # this approach is not working due API limitations
-            # see https://stackoverflow.com/a/56897605
-            #
-            # add_to_album(session, video["id"])
-
             # update DB
             db = DB(session)
             db[video["productUrl"]] = response
@@ -375,10 +381,7 @@ def load_page(session, youtube, token=None):
     videos = get_videos(session, token)
     for video in videos["mediaItems"]:
         item_url = video["productUrl"]
-        yt_url = db.get(item_url)
-        if yt_url:
-            print(f"Item {item_url} already migrated: {yt_url}")
-        else:
+        if item_url not in db:
             video_block(video, session, youtube)
 
     button = widgets.Button(description="Load more...")
