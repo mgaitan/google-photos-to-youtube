@@ -170,7 +170,7 @@ class DB(collections.abc.MutableMapping):
 
     def _repr_html_(self):
         html = ["<table width=100%>"]
-        for key, value in self.iteritems():
+        for key, value in self.items():
             html.append("<tr><th>Google Photos</th><th>Youtube</th></tr>")
             html.append("<tr>")
             html.append("<td>{0}</td>".format(key))
