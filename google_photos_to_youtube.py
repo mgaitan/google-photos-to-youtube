@@ -343,8 +343,13 @@ def video_block(video, session, youtube):
     def on_button_clicked(b):
         video_title = title.value.strip()
         if not video_title:
-            title.placeholder = "Enter a title"
-            title.focus()
+            title.placeholder = "This field is required"
+            try:
+                title.focus()
+            except AttributeError:
+                # requires ipython >=8.0
+                # https://github.com/jupyter-widgets/ipywidgets/commit/8b1abab
+                pass
             return
 
         with output:
