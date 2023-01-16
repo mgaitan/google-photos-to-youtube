@@ -18,6 +18,6 @@ The uploading process is done in chunks, so it doesn't require to download the f
 
 3. As your app will be in "Testing" mode, you need to authorize the specific accounts that will use the app. Goto to https://console.cloud.google.com/apis/credentials/consent and add them clicking in "Add user". It could be more than one account as the source Google Photos account and the Youtube account could be differents. 
 
-4. Open the notebook in Colab, run the cells and follow the instructions. 
+4. Open [the notebook](https://colab.research.google.com/github/mgaitan/google-photos-to-youtube/blob/main/google_photos_to_youtube.ipynb) in Colab, run the cells and follow the instructions. 
 
 
