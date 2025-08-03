@@ -251,10 +251,8 @@ def login(service):
         "photos": [
             "https://www.googleapis.com/auth/photoslibrary",
             "https://www.googleapis.com/auth/photoslibrary.readonly",
-            "https://www.googleapis.com/auth/photoslibrary.edit.appcreateddata", 
+            "https://www.googleapis.com/auth/photoslibrary.edit.appcreateddata",
             "https://www.googleapis.com/auth/photoslibrary.sharing",
-            "https://www.googleapis.com/auth/photoslibrary.appendonly",
-            "https://www.googleapis.com/auth/photoslibrary.readonly.appcreateddata",
         ],
         "youtube": ["https://www.googleapis.com/auth/youtube.upload"],
     }
