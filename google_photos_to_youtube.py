@@ -26,7 +26,7 @@ def create_client_id():
     if file.exists():
         print("file already exists")
         return
-    
+
     print("Setting up OAuth credentials...")
     print("IMPORTANT: When creating your OAuth app in Google Cloud Console:")
     print("  - Add these redirect URIs to your OAuth 2.0 Client IDs:")
@@ -35,7 +35,7 @@ def create_client_id():
     print("    * http://localhost:8081 (backup port)")
     print("    * http://localhost:8082 (backup port)")
     print()
-    
+
     client_id = input("CLIENT_ID: ")
     client_secret = getpass.getpass(prompt="CLIENT_SECRET: ")
 
@@ -47,7 +47,7 @@ def create_client_id():
             "token_uri": "https://www.googleapis.com/oauth2/v3/token",
             "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
             "redirect_uris": [
-                "http://localhost:8080", 
+                "http://localhost:8080",
                 "http://127.0.0.1:8080",
                 "http://localhost:8081",
                 "http://localhost:8082"
@@ -60,12 +60,12 @@ def create_client_id():
 
 class OAuthCallbackHandler(BaseHTTPRequestHandler):
     """HTTP request handler for OAuth callback"""
-    
+
     def do_GET(self):
         """Handle GET request with OAuth callback"""
         parsed_path = urllib.parse.urlparse(self.path)
         query_params = urllib.parse.parse_qs(parsed_path.query)
-        
+
         if 'code' in query_params:
             self.server.auth_code = query_params['code'][0]
             self.send_response(200)
@@ -95,10 +95,10 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
             </body>
             </html>
             """.encode())
-        
+
         # Shutdown server after handling request
         threading.Thread(target=self.server.shutdown).start()
-    
+
     def log_message(self, format, *args):
         """Suppress default logging"""
         return
@@ -153,19 +153,19 @@ def get_authorization_code(auth_url, port=8080):
         print("\n💡 The URL should look like:")
         print("   http://localhost:8080/?state=...&code=4/0AV...")
         print("="*60)
-        
+
         while True:
             full_url = input("\n📥 Paste the complete redirect URL here: ").strip()
-            
+
             if not full_url:
                 print("❌ Empty input. Please paste the URL.")
                 continue
-                
+
             if not full_url.startswith("http://localhost:8080"):
                 print("⚠️  The URL should start with 'http://localhost:8080'")
                 print("Make sure you copied the complete URL from the address bar.")
                 continue
-            
+
             # Extract code from URL
             code = extract_code_from_url(full_url)
             if code:
@@ -180,44 +180,44 @@ def get_authorization_code(auth_url, port=8080):
                 retry = input("Try again? (y/n): ").lower().strip()
                 if retry != 'y':
                     return None
-    
+
     server = HTTPServer(('localhost', port), OAuthCallbackHandler)
     server.auth_code = None
     server.auth_error = None
-    
+
     # Start server in background thread
     server_thread = threading.Thread(target=server.serve_forever)
     server_thread.daemon = True
     server_thread.start()
-    
+
     print(f"Starting local server on http://localhost:{port}")
     print(f"Opening browser to: {auth_url}")
-    
+
     # Try to open browser automatically
     try:
         webbrowser.open(auth_url)
     except Exception as e:
         print(f"Could not open browser automatically: {e}")
         print(f"Please manually navigate to: {auth_url}")
-    
+
     # Wait for callback
     print("Waiting for authentication...")
     timeout_counter = 0
     while server.auth_code is None and server.auth_error is None and timeout_counter < 300:  # 30 second timeout
         threading.Event().wait(0.1)
         timeout_counter += 1
-    
+
     server.server_close()
-    
+
     if timeout_counter >= 300:
         print("⚠️  Timeout waiting for OAuth callback. Falling back to manual entry.")
         print(f"Please navigate to: {auth_url}")
         code = input("Enter the authorization code: ")
         return code
-    
+
     if server.auth_error:
         raise Exception(f"Authentication error: {server.auth_error}")
-    
+
     return server.auth_code
 
 
@@ -229,19 +229,19 @@ def debug_scopes(session):
         print(f"Simple media read: {response.status_code}")
         if response.status_code != 200:
             print(f"Error: {response.json()}")
-            
+
         # Try albums read
         response = session.get("https://photoslibrary.googleapis.com/v1/albums")
         print(f"Albums read: {response.status_code}")
         if response.status_code != 200:
             print(f"Error: {response.json()}")
-            
+
         # Check credentials
         if hasattr(session.credentials, 'scopes'):
             print(f"Token scopes: {session.credentials.scopes}")
         else:
             print("No scopes information available")
-            
+
     except Exception as e:
         print(f"Debug error: {e}")
 
@@ -253,6 +253,8 @@ def login(service):
             "https://www.googleapis.com/auth/photoslibrary.readonly",
             "https://www.googleapis.com/auth/photoslibrary.edit.appcreateddata",
             "https://www.googleapis.com/auth/photoslibrary.sharing",
+            "https://www.googleapis.com/auth/photoslibrary.appendonly",
+            "https://www.googleapis.com/auth/photoslibrary.readonly.appcreateddata",
         ],
         "youtube": ["https://www.googleapis.com/auth/youtube.upload"],
     }
@@ -271,9 +273,9 @@ def login(service):
                 continue
         else:
             print("⚠️  No available ports found. Will use manual OAuth flow.")
-    
+
     redirect_uri = f"http://localhost:{port}"
-    
+
     # Create the flow using the client secrets file from the Google API
     flow = Flow.from_client_secrets_file(
         "client_id.json",
@@ -281,34 +283,15 @@ def login(service):
         redirect_uri=redirect_uri,
     )
 
-    # Get the authorization URL
-    auth_url, _ = flow.authorization_url(
-        prompt="consent",
-        access_type="offline"
-    )
+    # Tell the user to go to the authorization URL.
+    auth_url, _ = flow.authorization_url(prompt="consent")
 
-    # Get authorization code
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            code = get_authorization_code(auth_url, port)
-            if code:
-                flow.fetch_token(code=code)
-                break
-            else:
-                if attempt < max_retries - 1:
-                    print(f"Attempt {attempt + 1} failed. Trying again...")
-                    continue
-                else:
-                    raise Exception("Failed to get authorization code after all attempts")
-        except Exception as e:
-            if attempt < max_retries - 1:
-                print(f"OAuth attempt {attempt + 1} failed: {e}")
-                print("Trying again...")
-                continue
-            else:
-                print(f"OAuth flow failed after {max_retries} attempts: {e}")
-                raise
+    print("Please go to this URL: {}".format(auth_url))
+
+    # The user will get an authorization code. This code is used to get the
+    # access token.
+    code = input("Enter the authorization code: ")
+    flow.fetch_token(code=code)
 
     if service == "youtube":
         return build("youtube", "v3", credentials=flow.credentials)
@@ -346,17 +329,17 @@ def create_db_image(session, album_id):
 
 class DB(collections.abc.MutableMapping):
     """
-    A Borg (shared state) dict-like object to permanently store already migrated videos. 
-    It maps gphoto url to youtube urls. 
+    A Borg (shared state) dict-like object to permanently store already migrated videos.
+    It maps gphoto url to youtube urls.
 
     It's stored as a json blob in the description of the first item of the
     album "migrated-to-youtube" that's created if needed.
 
     This is a workaround to the limitations of the Goole Photos API
-    that doesn't allow to delete or update the description of items that weren't 
-    created by the app, nor add them to a custom album. 
+    that doesn't allow to delete or update the description of items that weren't
+    created by the app, nor add them to a custom album.
     """
-    _shared_state = {}  
+    _shared_state = {}
 
     def __init__(self, session):
         self.__dict__ = self._shared_state
@@ -375,7 +358,7 @@ class DB(collections.abc.MutableMapping):
     def __delitem__(self, key):
         del self.data[key]
         self._commit()
-    
+
     def __len__(self):
         return len(self.data)
 
@@ -390,7 +373,7 @@ class DB(collections.abc.MutableMapping):
 
     def _get_or_create_db(self):
         """
-        return the MediaItem dict of the image that's store our db. 
+        return the MediaItem dict of the image that's store our db.
         If the album doesn't exist, it's created and an image is uploaded.
         """
         result = self.session.get(
@@ -570,7 +553,7 @@ def video_block(video, session, youtube):
         value="private",
         description='Privacy status:',
         disabled=False,
-    ) 
+    )
     privacy.layout.width = "30em"
     tags = widgets.Text(
         value="google-photos-to-youtube, ",
