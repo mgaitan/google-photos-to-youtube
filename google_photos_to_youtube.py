@@ -142,31 +142,44 @@ def get_authorization_code(auth_url, port=8080):
     # In Colab, we can't run a local server, so fall back to manual entry
     if is_colab_environment():
         print("🔗 Running in Google Colab - using manual OAuth flow")
-        print("\nPlease follow these steps:")
-        print(f"1. Click this link to authorize: {auth_url}")
-        print("2. After authorization, you'll be redirected to a localhost URL that won't load")
-        print("3. DON'T PANIC! This is expected behavior in Colab")
-        print("4. Copy the ENTIRE URL from your browser's address bar")
-        print("5. Paste it below and we'll extract the code for you")
-        print("\nExample URL: http://localhost:8080/?state=xyz&code=4/0AV...")
+        print("\n" + "="*60)
+        print("📋 STEP-BY-STEP INSTRUCTIONS:")
+        print("="*60)
+        print(f"1. 🔗 CLICK THIS LINK: {auth_url}")
+        print("2. 📝 Sign in and authorize the application")
+        print("3. ⚠️  You'll be redirected to a localhost URL that WON'T LOAD - this is normal!")
+        print("4. 📋 COPY the COMPLETE URL from your browser's address bar")
+        print("5. 📥 PASTE it below")
+        print("\n💡 The URL should look like:")
+        print("   http://localhost:8080/?state=...&code=4/0AV...")
+        print("="*60)
         
-        full_url = input("\nPaste the full redirect URL here: ").strip()
-        
-        # Extract code from URL
-        code = extract_code_from_url(full_url)
-        if code:
-            print(f"✅ Successfully extracted authorization code!")
-            return code
-        else:
-            print("❌ No 'code' parameter found in URL. Please try again.")
-            print("Make sure you pasted the complete URL with the 'code' parameter.")
-            return None
-    
-    # Test URL parsing with the provided URL
-    if full_url and "code=" in full_url:
-        test_result = extract_code_from_url(full_url)
-        if test_result:
-            return test_result
+        while True:
+            full_url = input("\n📥 Paste the complete redirect URL here: ").strip()
+            
+            if not full_url:
+                print("❌ Empty input. Please paste the URL.")
+                continue
+                
+            if not full_url.startswith("http://localhost:8080"):
+                print("⚠️  The URL should start with 'http://localhost:8080'")
+                print("Make sure you copied the complete URL from the address bar.")
+                continue
+            
+            # Extract code from URL
+            code = extract_code_from_url(full_url)
+            if code:
+                print(f"✅ Perfect! Successfully extracted authorization code!")
+                print(f"   Code preview: {code[:20]}...")
+                return code
+            else:
+                print("❌ No 'code' parameter found in the URL.")
+                print("Please make sure you:")
+                print("   - Completed the authorization process")
+                print("   - Copied the COMPLETE URL including all parameters")
+                retry = input("Try again? (y/n): ").lower().strip()
+                if retry != 'y':
+                    return None
     
     server = HTTPServer(('localhost', port), OAuthCallbackHandler)
     server.auth_code = None
@@ -214,6 +227,7 @@ def login(service):
             "https://www.googleapis.com/auth/photoslibrary",
             "https://www.googleapis.com/auth/photoslibrary.edit.appcreateddata",
             "https://www.googleapis.com/auth/photoslibrary.sharing",
+            "https://www.googleapis.com/auth/photoslibrary.appendonly",
         ],
         "youtube": ["https://www.googleapis.com/auth/youtube.upload"],
     }
