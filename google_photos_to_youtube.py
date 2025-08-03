@@ -221,13 +221,40 @@ def get_authorization_code(auth_url, port=8080):
     return server.auth_code
 
 
+def debug_scopes(session):
+    """Debug function to check what scopes we actually have"""
+    try:
+        # Try a simple read operation first
+        response = session.get("https://photoslibrary.googleapis.com/v1/mediaItems", params={"pageSize": 1})
+        print(f"Simple media read: {response.status_code}")
+        if response.status_code != 200:
+            print(f"Error: {response.json()}")
+            
+        # Try albums read
+        response = session.get("https://photoslibrary.googleapis.com/v1/albums")
+        print(f"Albums read: {response.status_code}")
+        if response.status_code != 200:
+            print(f"Error: {response.json()}")
+            
+        # Check credentials
+        if hasattr(session.credentials, 'scopes'):
+            print(f"Token scopes: {session.credentials.scopes}")
+        else:
+            print("No scopes information available")
+            
+    except Exception as e:
+        print(f"Debug error: {e}")
+
+
 def login(service):
     scopes = {
         "photos": [
             "https://www.googleapis.com/auth/photoslibrary",
-            "https://www.googleapis.com/auth/photoslibrary.edit.appcreateddata",
+            "https://www.googleapis.com/auth/photoslibrary.readonly",
+            "https://www.googleapis.com/auth/photoslibrary.edit.appcreateddata", 
             "https://www.googleapis.com/auth/photoslibrary.sharing",
             "https://www.googleapis.com/auth/photoslibrary.appendonly",
+            "https://www.googleapis.com/auth/photoslibrary.readonly.appcreateddata",
         ],
         "youtube": ["https://www.googleapis.com/auth/youtube.upload"],
     }
