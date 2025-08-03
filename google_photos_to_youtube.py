@@ -2,7 +2,12 @@ import collections.abc
 import getpass
 import http.client as httplib
 import json
+import os
 import socket
+import threading
+import urllib.parse
+import webbrowser
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 from IPython.display import Markdown, display
@@ -21,6 +26,16 @@ def create_client_id():
     if file.exists():
         print("file already exists")
         return
+    
+    print("Setting up OAuth credentials...")
+    print("IMPORTANT: When creating your OAuth app in Google Cloud Console:")
+    print("  - Add these redirect URIs to your OAuth 2.0 Client IDs:")
+    print("    * http://localhost:8080")
+    print("    * http://127.0.0.1:8080")
+    print("    * http://localhost:8081 (backup port)")
+    print("    * http://localhost:8082 (backup port)")
+    print()
+    
     client_id = input("CLIENT_ID: ")
     client_secret = getpass.getpass(prompt="CLIENT_SECRET: ")
 
@@ -31,10 +46,125 @@ def create_client_id():
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
             "token_uri": "https://www.googleapis.com/oauth2/v3/token",
             "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-            "redirect_uris": ["urn:ietf:wg:oauth:2.0:oob", "http://localhost"],
+            "redirect_uris": [
+                "http://localhost:8080", 
+                "http://127.0.0.1:8080",
+                "http://localhost:8081",
+                "http://localhost:8082"
+            ],
         }
     }
     file.write_text(json.dumps(content, indent=2))
+    print("✓ Client configuration saved to client_id.json")
+
+
+class OAuthCallbackHandler(BaseHTTPRequestHandler):
+    """HTTP request handler for OAuth callback"""
+    
+    def do_GET(self):
+        """Handle GET request with OAuth callback"""
+        parsed_path = urllib.parse.urlparse(self.path)
+        query_params = urllib.parse.parse_qs(parsed_path.query)
+        
+        if 'code' in query_params:
+            self.server.auth_code = query_params['code'][0]
+            self.send_response(200)
+            self.send_header('Content-type', 'text/html')
+            self.end_headers()
+            self.wfile.write(b"""
+            <html>
+            <head><title>Authentication Complete</title></head>
+            <body>
+            <h1>Authentication successful!</h1>
+            <p>You can close this window and return to your notebook.</p>
+            <script>window.close();</script>
+            </body>
+            </html>
+            """)
+        elif 'error' in query_params:
+            self.server.auth_error = query_params['error'][0]
+            self.send_response(400)
+            self.send_header('Content-type', 'text/html')
+            self.end_headers()
+            self.wfile.write(f"""
+            <html>
+            <head><title>Authentication Error</title></head>
+            <body>
+            <h1>Authentication failed!</h1>
+            <p>Error: {query_params['error'][0]}</p>
+            </body>
+            </html>
+            """.encode())
+        
+        # Shutdown server after handling request
+        threading.Thread(target=self.server.shutdown).start()
+    
+    def log_message(self, format, *args):
+        """Suppress default logging"""
+        return
+
+
+def is_colab_environment():
+    """Check if running in Google Colab"""
+    try:
+        import google.colab
+        return True
+    except ImportError:
+        return False
+
+
+def get_authorization_code(auth_url, port=8080):
+    """Start local server and get authorization code"""
+    # In Colab, we can't run a local server, so fall back to manual entry
+    if is_colab_environment():
+        print("⚠️  Running in Google Colab - local server not available")
+        print("Please follow these steps:")
+        print(f"1. Click this link to authorize: {auth_url}")
+        print("2. After authorization, you'll be redirected to a non-working localhost URL")
+        print("3. Copy the 'code' parameter from that URL and paste it below")
+        print("\nExample: if redirected to http://localhost:8080/?code=ABC123...")
+        print("Then enter: ABC123")
+        code = input("\nEnter the authorization code: ")
+        return code
+    
+    server = HTTPServer(('localhost', port), OAuthCallbackHandler)
+    server.auth_code = None
+    server.auth_error = None
+    
+    # Start server in background thread
+    server_thread = threading.Thread(target=server.serve_forever)
+    server_thread.daemon = True
+    server_thread.start()
+    
+    print(f"Starting local server on http://localhost:{port}")
+    print(f"Opening browser to: {auth_url}")
+    
+    # Try to open browser automatically
+    try:
+        webbrowser.open(auth_url)
+    except Exception as e:
+        print(f"Could not open browser automatically: {e}")
+        print(f"Please manually navigate to: {auth_url}")
+    
+    # Wait for callback
+    print("Waiting for authentication...")
+    timeout_counter = 0
+    while server.auth_code is None and server.auth_error is None and timeout_counter < 300:  # 30 second timeout
+        threading.Event().wait(0.1)
+        timeout_counter += 1
+    
+    server.server_close()
+    
+    if timeout_counter >= 300:
+        print("⚠️  Timeout waiting for OAuth callback. Falling back to manual entry.")
+        print(f"Please navigate to: {auth_url}")
+        code = input("Enter the authorization code: ")
+        return code
+    
+    if server.auth_error:
+        raise Exception(f"Authentication error: {server.auth_error}")
+    
+    return server.auth_code
 
 
 def login(service):
@@ -47,26 +177,48 @@ def login(service):
         "youtube": ["https://www.googleapis.com/auth/youtube.upload"],
     }
 
+    # Find available port (skip if in Colab)
+    port = 8080
+    if not is_colab_environment():
+        for attempt_port in range(8080, 8083):
+            try:
+                test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                test_socket.bind(('localhost', attempt_port))
+                test_socket.close()
+                port = attempt_port
+                break
+            except OSError:
+                continue
+        else:
+            print("⚠️  No available ports found. Will use manual OAuth flow.")
+    
+    redirect_uri = f"http://localhost:{port}"
+    
     # Create the flow using the client secrets file from the Google API
-
     flow = Flow.from_client_secrets_file(
         "client_id.json",
         scopes=scopes[service],
-        redirect_uri="urn:ietf:wg:oauth:2.0:oob",
+        redirect_uri=redirect_uri,
     )
 
-    # Tell the user to go to the authorization URL.
-    auth_url, _ = flow.authorization_url(prompt="consent")
+    # Get the authorization URL
+    auth_url, _ = flow.authorization_url(
+        prompt="consent",
+        access_type="offline"
+    )
 
-    print("Please go to this URL: {}".format(auth_url))
-
-    # The user will get an authorization code. This code is used to get the
-    # access token.
-    code = input("Enter the authorization code: ")
-    flow.fetch_token(code=code)
+    # Get authorization code using local server
+    try:
+        code = get_authorization_code(auth_url, port)
+        flow.fetch_token(code=code)
+    except Exception as e:
+        print(f"OAuth flow failed: {e}")
+        print("Falling back to manual code entry...")
+        print(f"Please go to this URL: {auth_url}")
+        code = input("Enter the authorization code: ")
+        flow.fetch_token(code=code)
 
     if service == "youtube":
-
         return build("youtube", "v3", credentials=flow.credentials)
     else:
         return AuthorizedSession(flow.credentials)
