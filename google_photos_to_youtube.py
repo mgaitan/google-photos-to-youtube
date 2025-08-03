@@ -104,6 +104,30 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
         return
 
 
+def extract_code_from_url(url):
+    """Extract authorization code from OAuth redirect URL"""
+    try:
+        parsed_url = urllib.parse.urlparse(url)
+        query_params = urllib.parse.parse_qs(parsed_url.query)
+        if 'code' in query_params:
+            return query_params['code'][0]
+        return None
+    except Exception:
+        return None
+
+
+def test_url_parsing():
+    """Test function to validate URL parsing"""
+    test_url = "http://localhost:8080/?state=8fYMViW098rYazQZGAP9uf6z8Ua33F&code=4/0AVMBsJgI0mB5Div31ZKhIKKyJhtDwT9fF-oKz7HWjo814rn7d9lTbP_LjaWnP9N6WvlGfw&scope=https://www.googleapis.com/auth/photoslibrary.edit.appcreateddata%20https://www.googleapis.com/auth/photoslibrary.sharing%20https://www.googleapis.com/auth/photoslibrary"
+    code = extract_code_from_url(test_url)
+    if code:
+        print(f"✅ URL parsing test passed! Extracted code: {code[:20]}...")
+        return True
+    else:
+        print("❌ URL parsing test failed!")
+        return False
+
+
 def is_colab_environment():
     """Check if running in Google Colab"""
     try:
@@ -117,15 +141,32 @@ def get_authorization_code(auth_url, port=8080):
     """Start local server and get authorization code"""
     # In Colab, we can't run a local server, so fall back to manual entry
     if is_colab_environment():
-        print("⚠️  Running in Google Colab - local server not available")
-        print("Please follow these steps:")
+        print("🔗 Running in Google Colab - using manual OAuth flow")
+        print("\nPlease follow these steps:")
         print(f"1. Click this link to authorize: {auth_url}")
-        print("2. After authorization, you'll be redirected to a non-working localhost URL")
-        print("3. Copy the 'code' parameter from that URL and paste it below")
-        print("\nExample: if redirected to http://localhost:8080/?code=ABC123...")
-        print("Then enter: ABC123")
-        code = input("\nEnter the authorization code: ")
-        return code
+        print("2. After authorization, you'll be redirected to a localhost URL that won't load")
+        print("3. DON'T PANIC! This is expected behavior in Colab")
+        print("4. Copy the ENTIRE URL from your browser's address bar")
+        print("5. Paste it below and we'll extract the code for you")
+        print("\nExample URL: http://localhost:8080/?state=xyz&code=4/0AV...")
+        
+        full_url = input("\nPaste the full redirect URL here: ").strip()
+        
+        # Extract code from URL
+        code = extract_code_from_url(full_url)
+        if code:
+            print(f"✅ Successfully extracted authorization code!")
+            return code
+        else:
+            print("❌ No 'code' parameter found in URL. Please try again.")
+            print("Make sure you pasted the complete URL with the 'code' parameter.")
+            return None
+    
+    # Test URL parsing with the provided URL
+    if full_url and "code=" in full_url:
+        test_result = extract_code_from_url(full_url)
+        if test_result:
+            return test_result
     
     server = HTTPServer(('localhost', port), OAuthCallbackHandler)
     server.auth_code = None
@@ -207,16 +248,28 @@ def login(service):
         access_type="offline"
     )
 
-    # Get authorization code using local server
-    try:
-        code = get_authorization_code(auth_url, port)
-        flow.fetch_token(code=code)
-    except Exception as e:
-        print(f"OAuth flow failed: {e}")
-        print("Falling back to manual code entry...")
-        print(f"Please go to this URL: {auth_url}")
-        code = input("Enter the authorization code: ")
-        flow.fetch_token(code=code)
+    # Get authorization code
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            code = get_authorization_code(auth_url, port)
+            if code:
+                flow.fetch_token(code=code)
+                break
+            else:
+                if attempt < max_retries - 1:
+                    print(f"Attempt {attempt + 1} failed. Trying again...")
+                    continue
+                else:
+                    raise Exception("Failed to get authorization code after all attempts")
+        except Exception as e:
+            if attempt < max_retries - 1:
+                print(f"OAuth attempt {attempt + 1} failed: {e}")
+                print("Trying again...")
+                continue
+            else:
+                print(f"OAuth flow failed after {max_retries} attempts: {e}")
+                raise
 
     if service == "youtube":
         return build("youtube", "v3", credentials=flow.credentials)

@@ -27,9 +27,22 @@ The uploading process is done in chunks, so it doesn't require downloading the f
 
 5. Open [the notebook](https://colab.research.google.com/github/mgaitan/google-photos-to-youtube/blob/main/google_photos_to_youtube.ipynb) in Colab, run the cells and follow the instructions.
 
+## Authentication in Google Colab
+
+When running in Google Colab, the OAuth process works as follows:
+
+1. The system will display a link to authorize your app
+2. Click the link and complete the Google OAuth flow
+3. **Important**: After authorization, you'll be redirected to a `localhost:8080` URL that won't load in Colab
+4. **This is expected!** Simply copy the entire URL from your browser's address bar
+5. Paste the complete URL back into the notebook when prompted
+6. The system will automatically extract the authorization code from the URL
+
+Example: If redirected to `http://localhost:8080/?state=xyz&code=4/0AV...`, just copy and paste that entire URL.
+
 ## What's New
 
-- **Fixed OAuth Flow**: Replaced the deprecated Out-of-Band (OOB) OAuth flow with a modern local server-based approach
-- **Automatic Browser Opening**: The authentication process now automatically opens your browser when possible
+- **Fixed OAuth Flow**: Replaced the deprecated Out-of-Band (OOB) OAuth flow with a modern approach
+- **Colab-Optimized**: Special handling for Google Colab environments with manual URL extraction
 - **Better Error Handling**: More informative error messages and fallback options
-- **Port Auto-detection**: Automatically finds an available port for the OAuth callback
+- **Automatic Code Extraction**: No need to manually parse authorization codes from URLs
